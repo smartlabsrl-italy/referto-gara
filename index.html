@@ -18,7 +18,7 @@
 <style>
 :root{
   --bg:#e9eee8; --surface:#ffffff; --ink:#0f1d16; --muted:#5a6a61; --line:#cfd8d0;
-  --us:#16663f; --us-soft:#dcefe3; --them:#294a7d; --them-soft:#dfe7f4;
+  --us:#0055bf; --us-soft:#dce7f8; --them:#1f1f1f; --them-soft:#e8e8e8;
   --yellow:#f2c200; --red:#d3261c; --enter:#12a150; --pick:#ffe27a;
   --num:"Barlow Condensed","Arial Narrow","Roboto Condensed",sans-serif;
   --txt:"Barlow",-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
@@ -29,12 +29,12 @@
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#0c1410; --surface:#16211b; --ink:#eef4ef; --muted:#9db0a4; --line:#2a3a31;
-    --us:#3ccf7f; --us-soft:#123322; --them:#7fa6ee; --them-soft:#16233b; --pick:#6b5710;
+    --us:#4c8dff; --us-soft:#122a4a; --them:#b5b5b5; --them-soft:#2a2a2a; --pick:#6b5710;
   }
 }
 :root[data-theme="dark"]{
   --bg:#0c1410; --surface:#16211b; --ink:#eef4ef; --muted:#9db0a4; --line:#2a3a31;
-  --us:#3ccf7f; --us-soft:#123322; --them:#7fa6ee; --them-soft:#16233b; --pick:#6b5710;
+  --us:#4c8dff; --us-soft:#122a4a; --them:#b5b5b5; --them-soft:#2a2a2a; --pick:#6b5710;
 }
 *,*::before,*::after{box-sizing:border-box}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
@@ -121,6 +121,12 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 @keyframes pulse{from{filter:brightness(1)}to{filter:brightness(.9)}}
 .dim{opacity:.35;pointer-events:none}
 
+/* ---------- sponsor ---------- */
+#sponsorBar{position:fixed;left:0;right:0;bottom:0;z-index:5;display:flex;align-items:center;justify-content:center;
+  height:56px;padding:6px calc(12px + env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) calc(12px + env(safe-area-inset-left,0px));
+  background:var(--surface);border-top:1px solid var(--line)}
+#sponsorBar img{max-height:100%;max-width:100%;object-fit:contain}
+
 /* ---------- toast / mode bar ---------- */
 #toast{position:fixed;left:50%;bottom:calc(78px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;
   background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:600;font-size:15px;
@@ -141,7 +147,7 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 .wrap{max-width:520px;margin:0 auto}
 .fld{display:block;margin-bottom:12px}
 .fld > span{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
-.fld input[type=text],.fld input[type=email],.fld input[type=number]{width:100%;height:46px;border-radius:10px;
+.fld input[type=text],.fld input[type=number]{width:100%;height:46px;border-radius:10px;
   border:1px solid var(--line);background:var(--surface);padding:0 12px;font-size:17px;-webkit-user-select:text;user-select:text}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .chk{display:flex;align-items:center;gap:10px;font-size:15px;margin:4px 0 12px}
@@ -195,6 +201,8 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
   <section class="side them" id="side-them"></section>
 </main>
 
+<div id="sponsorBar"><img id="sponsorImg" src="sponsor.png" alt="Sponsor" onerror="this.closest('#sponsorBar').style.display='none'"></div>
+
 <div id="toast"></div>
 <div id="modeBar"><span id="modeTxt"></span><button id="modeCancel">Annulla</button></div>
 
@@ -215,7 +223,6 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
       <label class="fld"><span>Slot</span><input type="number" id="sSlots" min="1" max="10" inputmode="numeric"></label>
     </div>
     <label class="chk"><input type="checkbox" id="sSlotsOn"> Conteggia gli slot di sostituzione</label>
-    <label class="fld"><span>Email della segreteria</span><input type="email" id="sEmail" autocomplete="off" placeholder="segreteria@societa.it"></label>
     <button class="big" id="btnSaveSet" style="display:none">Salva impostazioni</button>
   </div>
   <div id="newSec">
@@ -259,7 +266,7 @@ const SLOT_WINDOW=120000;
 function load(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}}
 function store(k,v){try{if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 
-let S=Object.assign({team:'',half:45,maxSubs:5,maxSlots:3,slotsOn:true,email:''},load(LS_SET)||{});
+let S=Object.assign({team:'',half:45,maxSubs:5,maxSlots:3,slotsOn:true},load(LS_SET)||{});
 let M=load(LS_MATCH);
 let C=null;          // stato calcolato
 let mode=null;       // {team, in} durante la scelta di chi esce
@@ -469,12 +476,12 @@ async function makePDF(){
   const safe=s=>s.replace(/[^\w\-]+/g,'_');
   const fname='Referto_'+safe(tn(hk))+'_'+safe(tn(ak))+'_'+M.date+'.pdf';
   const blob=d.output('blob');let file=null;try{file=new File([blob],fname,{type:'application/pdf'})}catch(e){}
-  const text='Referto '+tn(hk)+' - '+tn(ak)+' del '+itDate(M.date)+(S.email?'\nDestinatario: '+S.email:'');
+  const text='Referto '+tn(hk)+' - '+tn(ak)+' del '+itDate(M.date);
   if(file&&navigator.canShare&&navigator.canShare({files:[file]})){
     try{await navigator.share({files:[file],title:fname,text});M.pdfDone=true;store(LS_MATCH,M);return}
     catch(e){if(e&&e.name==='AbortError')return}}
   d.save(fname);M.pdfDone=true;store(LS_MATCH,M);
-  if(S.email)toast('PDF salvato: allegalo a una mail per '+S.email);
+  toast('PDF salvato, condividilo da qui');
 }
 
 /* ---------- installazione PWA ---------- */
@@ -502,10 +509,10 @@ refreshInstallUI();
 
 /* ---------- setup / menu ---------- */
 function fillSetup(){$('sTeam').value=S.team;$('sHalf').value=S.half;$('sSubs').value=S.maxSubs;$('sSlots').value=S.maxSlots;
-  $('sSlotsOn').checked=S.slotsOn;$('sEmail').value=S.email;$('sOpp').value='';setupHome=true;segs()}
+  $('sSlotsOn').checked=S.slotsOn;$('sOpp').value='';setupHome=true;segs()}
 function readSettings(){const num=(id,def,min,max)=>{const v=parseInt($(id).value,10);return isNaN(v)?def:Math.min(max,Math.max(min,v))};
   S.team=$('sTeam').value.trim();S.half=num('sHalf',45,1,60);S.maxSubs=num('sSubs',5,0,20);S.maxSlots=num('sSlots',3,1,10);
-  S.slotsOn=$('sSlotsOn').checked;S.email=$('sEmail').value.trim();store(LS_SET,S)}
+  S.slotsOn=$('sSlotsOn').checked;store(LS_SET,S)}
 function segs(){$('segHome').classList.toggle('on',setupHome);$('segAway').classList.toggle('on',!setupHome)}
 function showSetup(onlySettings){fillSetup();$('newSec').style.display=onlySettings?'none':'block';
   $('btnSaveSet').style.display=onlySettings?'block':'none';$('btnSetClose').style.display=onlySettings?'block':'none';
