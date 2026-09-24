@@ -1,0 +1,15 @@
+REFERTO GARA - pubblicazione su GitHub Pages (gratis)
+
+1. Crea un account su github.com e un nuovo repository pubblico, per esempio "referto".
+2. Nel repository: "Add file" > "Upload files", carica TUTTI i file di questa cartella
+   (index.html, manifest.json, sw.js, icon-180.png, icon-192.png, icon-512.png) e conferma.
+3. Settings > Pages > Source: "Deploy from a branch", branch "main", cartella "/ (root)", Save.
+4. Dopo un paio di minuti la pagina è online su: https://TUONOME.github.io/referto/
+
+Sul telefono dei dirigenti:
+- iPhone: apri il link con Safari > Condividi > "Aggiungi alla schermata Home".
+- Android: apri il link con Chrome > menu ⋮ > "Installa app" o "Aggiungi a schermata Home".
+Aprila una volta con la connessione: da quel momento funziona anche senza campo.
+
+Per aggiornare la pagina in futuro: ricarica index.html nel repository e cambia
+'referto-v1' in 'referto-v2' dentro sw.js.
