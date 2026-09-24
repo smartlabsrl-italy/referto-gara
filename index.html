@@ -137,6 +137,11 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 #modeBar.on{display:flex}
 #modeBar span{flex:1}
 #modeBar button{background:var(--ink);color:var(--bg);border-radius:10px;padding:10px 14px;font-weight:600}
+#updateBar{position:fixed;left:0;right:0;bottom:0;z-index:26;display:none;align-items:center;gap:10px;
+  padding:12px 12px calc(12px + env(safe-area-inset-bottom,0px));background:var(--us);color:#fff;font-weight:700}
+#updateBar.on{display:flex}
+#updateBar span{flex:1}
+#updateBar button{background:#fff;color:var(--us);border-radius:10px;padding:10px 14px;font-weight:700}
 
 /* ---------- overlays ---------- */
 .ov{position:fixed;inset:0;z-index:40;background:var(--bg);overflow-y:auto;display:none;
@@ -205,6 +210,7 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 
 <div id="toast"></div>
 <div id="modeBar"><span id="modeTxt"></span><button id="modeCancel">Annulla</button></div>
+<div id="updateBar"><span>È disponibile una versione più recente dell'app</span><button id="btnUpdateNow">Aggiorna ora</button></div>
 
 <!-- setup -->
 <div class="ov" id="setup"><div class="wrap">
@@ -242,6 +248,7 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
   <button class="item" id="mInstall" style="display:none">Installa l'app sul telefono</button>
   <button class="item" id="mPdf">Genera e invia il PDF</button>
   <button class="item" id="mChrono">Cronologia eventi</button>
+  <button class="item" id="mCheckUpdate">Controlla aggiornamenti</button>
   <button class="item" id="mSet">Impostazioni campionato</button>
   <button class="item danger" id="mEnd">Termina partita in anticipo</button>
   <button class="item danger" id="mReset">Nuova partita (cancella tutto)</button>
@@ -261,6 +268,7 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 'use strict';
 const $=id=>document.getElementById(id);
 const LS_SET='referto_settings_v1', LS_MATCH='referto_match_v1';
+const APP_VERSION='2026.09.24.1';
 const SLOT_WINDOW=120000;
 
 function load(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}}
@@ -506,6 +514,22 @@ async function doInstall(){
 $('btnInstall').onclick=doInstall;
 $('mInstall').onclick=()=>{$('menu').classList.remove('on');doInstall()};
 refreshInstallUI();
+
+/* ---------- controllo aggiornamenti ---------- */
+async function checkUpdate(manual){
+  try{
+    const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});
+    if(!r.ok)throw 0;
+    const data=await r.json();
+    if(data.v&&data.v!==APP_VERSION){$('updateBar').classList.add('on');return}
+    if(manual)toast('Hai già l\'ultima versione');
+  }catch(e){if(manual)toast('Impossibile controllare, verifica la connessione')}
+}
+$('btnUpdateNow').onclick=()=>location.reload();
+$('mCheckUpdate').onclick=()=>{$('menu').classList.remove('on');checkUpdate(true)};
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate(false)});
+checkUpdate(false);
+setInterval(()=>checkUpdate(false),15*60000);
 
 /* ---------- setup / menu ---------- */
 function fillSetup(){$('sTeam').value=S.team;$('sHalf').value=S.half;$('sSubs').value=S.maxSubs;$('sSlots').value=S.maxSlots;

@@ -11,5 +11,12 @@ Sul telefono dei dirigenti:
 - Android: apri il link con Chrome > menu ⋮ > "Installa app" o "Aggiungi a schermata Home".
 Aprila una volta con la connessione: da quel momento funziona anche senza campo.
 
-Per aggiornare la pagina in futuro: ricarica index.html nel repository e cambia
-'referto-v1' in 'referto-v2' dentro sw.js.
+Per aggiornare la pagina in futuro: carica il nuovo index.html (o gli altri
+file cambiati) e cambia la stringa di versione (es. da 2026.09.24.1 a
+2026.09.24.2) in TUTTI E TRE questi punti, con lo stesso valore:
+  - version.json (campo "v")
+  - index.html, costante APP_VERSION
+  - sw.js, costante CACHE (dentro "referto-...")
+A quel punto chi ha già installato l'app se la vede segnalare da sola, con un
+tasto "Aggiorna ora" che appare in basso la prima volta che apre l'app con
+connessione dopo la pubblicazione. Non serve fare nient'altro.

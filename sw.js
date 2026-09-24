@@ -1,5 +1,7 @@
 // Referto Gara: tiene in memoria la pagina per aprirla anche senza campo.
-const CACHE = 'referto-v1';
+// Ad ogni nuova versione cambiare questo nome (stessa stringa di version.json e di
+// APP_VERSION in index.html), così i telefoni già installati scaricano la novità.
+const CACHE = 'referto-2026.09.24.1';
 const CORE = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-180.png',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'];
 
