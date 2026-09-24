@@ -156,6 +156,9 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 .menu .meta{color:var(--muted);font-size:14px;margin-bottom:14px}
 .close{float:right;height:40px;padding:0 14px;border-radius:10px;background:var(--surface);border:1px solid var(--line);font-weight:600}
 .note{font-size:13px;color:var(--muted);margin:-4px 0 12px}
+.installBox{background:var(--us-soft);border:1px solid var(--us);border-radius:12px;padding:12px 14px;margin-bottom:18px}
+.installBox p{margin:0 0 10px;font-size:14px;line-height:1.4}
+.installBox .big{margin-top:0}
 .chrono li{list-style:none;display:grid;grid-template-columns:52px 1fr;gap:8px;padding:9px 0;border-bottom:1px solid var(--line);font-size:15px}
 .chrono{padding:0;margin:0}
 .chrono b{font-family:var(--num);font-size:18px}
@@ -198,6 +201,10 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 <!-- setup -->
 <div class="ov" id="setup"><div class="wrap">
   <h1>Referto gara</h1>
+  <div class="installBox" id="installBox" style="display:none">
+    <p id="installTxt"></p>
+    <button class="big" id="btnInstall">Installa l'app</button>
+  </div>
   <div id="setSec">
     <h2>Impostazioni campionato</h2>
     <p class="note">Restano salvate su questo telefono e non si cancellano con una nuova partita.</p>
@@ -225,6 +232,7 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
   <button class="close" id="menuClose">Chiudi</button>
   <h1>Menu</h1>
   <div class="meta" id="menuMeta"></div>
+  <button class="item" id="mInstall" style="display:none">Installa l'app sul telefono</button>
   <button class="item" id="mPdf">Genera e invia il PDF</button>
   <button class="item" id="mChrono">Cronologia eventi</button>
   <button class="item" id="mSet">Impostazioni campionato</button>
@@ -468,6 +476,29 @@ async function makePDF(){
   d.save(fname);M.pdfDone=true;store(LS_MATCH,M);
   if(S.email)toast('PDF salvato: allegalo a una mail per '+S.email);
 }
+
+/* ---------- installazione PWA ---------- */
+let deferredPrompt=null;
+const isIOS=/iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase())&&!window.MSStream;
+const isStandalone=()=>window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+function refreshInstallUI(){
+  const show=!isStandalone()&&(deferredPrompt||isIOS);
+  $('installBox').style.display=show?'block':'none';
+  $('mInstall').style.display=show?'block':'none';
+  if(show)$('installTxt').textContent=isIOS
+    ?'Per usarla come un\'app: tocca "Condividi" (il riquadro con la freccia in su), poi "Aggiungi alla schermata Home".'
+    :'Installa l\'app sul telefono: si apre più velocemente e funziona anche senza connessione.';
+}
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;refreshInstallUI()});
+window.addEventListener('appinstalled',()=>{deferredPrompt=null;refreshInstallUI();toast('App installata')});
+async function doInstall(){
+  if(deferredPrompt){const p=deferredPrompt;deferredPrompt=null;await p.prompt();refreshInstallUI();return}
+  if(isIOS){toast('Tocca "Condividi", poi "Aggiungi alla schermata Home"');return}
+  toast('Apri il menu del browser e cerca "Installa app" o "Aggiungi a schermata Home"');
+}
+$('btnInstall').onclick=doInstall;
+$('mInstall').onclick=()=>{$('menu').classList.remove('on');doInstall()};
+refreshInstallUI();
 
 /* ---------- setup / menu ---------- */
 function fillSetup(){$('sTeam').value=S.team;$('sHalf').value=S.half;$('sSubs').value=S.maxSubs;$('sSlots').value=S.maxSlots;
