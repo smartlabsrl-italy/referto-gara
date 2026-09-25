@@ -181,6 +181,17 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 .chrono{padding:0;margin:0}
 .chrono b{font-family:var(--num);font-size:18px}
 .chrono .u{color:var(--us);font-weight:600} .chrono .h{color:var(--them);font-weight:600}
+.repHead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-weight:700;font-size:16px}
+.repHead span:last-child{font-weight:500;font-size:13px;color:var(--muted);white-space:nowrap}
+.repRes{font-weight:700;font-size:15px;margin:4px 0 14px}
+.repCols{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}
+.repTeam{font-weight:700;font-size:13.5px;margin-bottom:4px}
+.col.us .repTeam{color:var(--us)}
+.col.them .repTeam{color:var(--them)}
+.repLine{font-size:12.5px;line-height:1.5;word-break:break-word}
+.repSubHead{font-weight:600;margin-top:4px}
+.repSub{padding-left:6px}
+.repFasi{color:var(--muted);margin-bottom:8px}
 #dlg{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:20px}
 #dlg.on{display:flex}
 #dlg .box{background:var(--surface);border-radius:16px;padding:18px;max-width:380px;width:100%}
@@ -253,6 +264,7 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
   <h1>Menu</h1>
   <div class="meta" id="menuMeta"></div>
   <button class="item" id="mInstall" style="display:none">Installa l'app sul telefono</button>
+  <button class="item" id="mRiepilogo">Riepilogo (anteprima)</button>
   <button class="item" id="mPdf">Genera e invia il PDF</button>
   <button class="item" id="mChrono">Cronologia eventi</button>
   <button class="item" id="mCheckUpdate">Controlla aggiornamenti</button>
@@ -268,6 +280,14 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
   <ul class="chrono" id="chronoList"></ul>
 </div></div>
 
+<!-- riepilogo -->
+<div class="ov" id="riepilogo"><div class="wrap">
+  <button class="close" id="riepilogoClose">Chiudi</button>
+  <h1>Riepilogo</h1>
+  <div id="riepilogoBody"></div>
+  <button class="big" id="riepilogoPdf" style="margin-top:16px">Genera e invia il PDF</button>
+</div></div>
+
 <div id="dlg"><div class="box"><p id="dlgMsg"></p><div class="btns"><button id="dlgNo">Annulla</button><button id="dlgOk">Conferma</button></div></div></div>
 
 <script>
@@ -275,7 +295,7 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 'use strict';
 const $=id=>document.getElementById(id);
 const LS_SET='referto_settings_v1', LS_MATCH='referto_match_v1';
-const APP_VERSION='2026.09.24.4';
+const APP_VERSION='2026.09.25.1';
 const SLOT_WINDOW=120000;
 
 function load(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}}
@@ -419,7 +439,7 @@ function tick(){
     case '1T':if(el<h){txt='Fine 1° tempo tra '+fmt(h-el);b.classList.add('locked')}else txt='Tieni premuto per chiudere il 1° tempo';break;
     case 'INT':txt='Tieni premuto per iniziare il 2° tempo';break;
     case '2T':if(el<h){txt='Fine partita tra '+fmt(h-el);b.classList.add('locked')}else txt='Tieni premuto per chiudere la partita';break;
-    case 'END':txt='Genera e invia il referto PDF';b.classList.add('pdf');break;
+    case 'END':txt='Apri il riepilogo della partita';b.classList.add('pdf');break;
   }
   $('phaseTxt').textContent=txt;
   for(const k of ['us','them']){const o=openSlot(k),box=$(k==='us'?'slotUs':'slotThem');
@@ -462,10 +482,68 @@ function nextPhase(){const el=elNow(),h=H();
   mode=null;push({type:'phase',to});vib(80);toast(desc(M.events[M.events.length-1]))}
 
 /* ---------- PDF ---------- */
+/* ---------- dati referto (condivisi da anteprima e PDF) ---------- */
+function reportData(){
+  const hk=M.home?'us':'them',ak=oth(hk);
+  const ev=k=>M.events.filter(e=>e.team===k);
+  const list=(arr,f)=>arr.length?arr.map(f).join(', '):'nessuno';
+  function block(k){const E=ev(k),T=C.T[k];
+    const og=E.filter(e=>e.type==='og');
+    const subs=E.filter(e=>e.type==='sub');
+    const groups=[];for(const s of subs){const key=s.slot===undefined?'x'+groups.length:String(s.slot);
+      let g=groups.find(g=>g.key===key&&key!=='x');if(!g){g={key,slot:s.slot,items:[]};groups.push(g)}g.items.push(s)}
+    return{
+      name:tn(k),tag:k===hk?'casa':'ospiti',
+      marcatori:list(E.filter(e=>e.type==='goal'),e=>'n.'+e.num+' ('+e.min+')'),
+      autogol:og.length?list(og,e=>'n.'+e.num+' ('+e.min+')'):null,
+      ammoniti:list(E.filter(e=>e.type==='yellow'&&!e.second),e=>'n.'+e.num+' ('+e.min+')'),
+      espulsi:list(E.filter(e=>e.type==='red'||(e.type==='yellow'&&e.second)),e=>'n.'+e.num+' ('+e.min+(e.second?', doppia ammonizione':'')+')'),
+      subsLabel:'Sostituzioni: '+T.subs+'/'+M.maxSubs+(M.slotsOn?'    Slot: '+T.slots+'/'+M.maxSlots:''),
+      subsGroups:groups.map(g=>({label:g.slot==='INT'?'Intervallo':typeof g.slot==='number'?'Slot '+g.slot+' ('+g.items[0].min+')':g.items[0].min,
+        text:g.items.map(s=>'entra '+s.in+' per '+s.out+(typeof g.slot==='number'&&s.min!==g.items[0].min?' ('+s.min+')':'')).join('; ')})),
+      cronologia:M.events.filter(e=>e.team===k&&e.type!=='slotclose').map(e=>({min:e.min,text:desc(e)}))
+    }}
+  return{hk,ak,titolo:tn(hk)+' - '+tn(ak),data:itDate(M.date),
+    risultato:C.T[hk].goals+' - '+C.T[ak].goals+(C.forced?' (partita terminata in anticipo)':''),
+    fasi:M.events.filter(e=>e.type==='phase').map(e=>e.min+' '+desc(e)).join('  ·  '),
+    us:block('us'),them:block('them')}
+}
+
+/* ---------- anteprima a schermo ---------- */
+function repBlock(rep){
+  let h='<div class="repTeam">'+esc(rep.name)+' ('+rep.tag+')</div>';
+  h+='<div class="repLine"><b>Marcatori:</b> '+esc(rep.marcatori)+'</div>';
+  if(rep.autogol)h+='<div class="repLine"><b>Autogol:</b> '+esc(rep.autogol)+'</div>';
+  h+='<div class="repLine"><b>Ammoniti:</b> '+esc(rep.ammoniti)+'</div>';
+  h+='<div class="repLine"><b>Espulsi:</b> '+esc(rep.espulsi)+'</div>';
+  h+='<div class="repLine repSubHead">'+esc(rep.subsLabel)+'</div>';
+  if(!rep.subsGroups.length)h+='<div class="repLine repSub">nessuna</div>';
+  for(const g of rep.subsGroups)h+='<div class="repLine repSub">'+esc(g.label)+': '+esc(g.text)+'</div>';
+  return h}
+function repCrono(rep){
+  let h='<div class="repTeam">'+esc(rep.name)+'</div>';
+  if(!rep.cronologia.length)h+='<div class="repLine">nessun evento</div>';
+  for(const e of rep.cronologia)h+='<div class="repLine">'+esc(e.min)+'  '+esc(e.text)+'</div>';
+  return h}
+function showRiepilogo(){
+  if(!M||!M.events.length){toast('Nessun dato da mostrare');return}
+  const R=reportData();
+  let h='<div class="repHead"><span class="t">'+esc(R.titolo)+'</span><span>'+esc(R.data)+'</span></div>';
+  h+='<div class="repRes">Risultato: '+esc(R.risultato)+'</div>';
+  h+='<div class="repCols"><div class="col us">'+repBlock(R.us)+'</div><div class="col them">'+repBlock(R.them)+'</div></div>';
+  h+='<h2>Cronologia</h2>';
+  if(R.fasi)h+='<div class="repLine repFasi">'+esc(R.fasi)+'</div>';
+  h+='<div class="repCols"><div class="col us">'+repCrono(R.us)+'</div><div class="col them">'+repCrono(R.them)+'</div></div>';
+  $('riepilogoBody').innerHTML=h;
+  $('menu').classList.remove('on');$('riepilogo').classList.add('on')}
+$('riepilogoClose').onclick=()=>$('riepilogo').classList.remove('on');
+$('riepilogoPdf').onclick=()=>{$('riepilogo').classList.remove('on');makePDF()};
+
+/* ---------- PDF ---------- */
 async function makePDF(){
   if(!window.jspdf){toast('Modulo PDF non disponibile: apri la pagina una volta con la connessione');return}
-  const {jsPDF}=window.jspdf;const d=new jsPDF({unit:'mm',format:'a4'});
-  const hk=M.home?'us':'them',ak=oth(hk);let y=20;
+  const R=reportData();
+  const {jsPDF}=window.jspdf;const d=new jsPDF({unit:'mm',format:'a4'});let y=20;
   function t(txt,sz,b,ind){sz=sz||10.5;ind=ind||0;d.setFont('helvetica',b?'bold':'normal');d.setFontSize(sz);
     for(const l of d.splitTextToSize(txt,180-ind)){if(y>282){d.addPage();y=20}d.text(l,15+ind,y);y+=sz*0.42+1.6}}
   const hr=()=>{d.setDrawColor(190);d.line(15,y-2,195,y-2);y+=4};
@@ -475,44 +553,36 @@ async function makePDF(){
       for(const l of d.splitTextToSize(txt,colW-ind)){if(cy>282){d.addPage();cy=20}d.text(l,x0+ind,cy);cy+=sz*0.42+1.6}},
       sp(mm){cy+=mm},get y(){return cy}}}
   t('REFERTO GARA',17,true);y+=1;
-  d.setFont('helvetica','bold');d.setFontSize(14);d.text(tn(hk)+' - '+tn(ak),15,y);
-  d.setFont('helvetica','normal');d.setFontSize(11);d.text('Data: '+itDate(M.date),195,y,{align:'right'});
+  d.setFont('helvetica','bold');d.setFontSize(14);d.text(R.titolo,15,y);
+  d.setFont('helvetica','normal');d.setFontSize(11);d.text('Data: '+R.data,195,y,{align:'right'});
   y+=14*0.42+2.5;
-  t('Risultato finale: '+C.T[hk].goals+' - '+C.T[ak].goals+(C.forced?'  (partita terminata in anticipo)':''),12.5,true);
+  t('Risultato finale: '+R.risultato,12.5,true);
   y+=2;hr();
-  const ev=k=>M.events.filter(e=>e.team===k);
-  const list=(arr,f)=>arr.length?arr.map(f).join(', '):'nessuno';
   const wl=writer(xL,y),wr=writer(xR,y);
-  for(const[k,w]of[['us',wl],['them',wr]]){const E=ev(k),T=C.T[k];
-    w.t(tn(k)+(k===hk?' (casa)':' (ospiti)'),13,true);w.sp(1);
-    w.t('Marcatori: '+list(E.filter(e=>e.type==='goal'),e=>'n.'+e.num+' ('+e.min+')'),10.5,false,2);
-    const og=E.filter(e=>e.type==='og');if(og.length)w.t('Autogol: '+list(og,e=>'n.'+e.num+' ('+e.min+')'),10.5,false,2);
-    w.t('Ammoniti: '+list(E.filter(e=>e.type==='yellow'&&!e.second),e=>'n.'+e.num+' ('+e.min+')'),10.5,false,2);
-    w.t('Espulsi: '+list(E.filter(e=>e.type==='red'||(e.type==='yellow'&&e.second)),e=>'n.'+e.num+' ('+e.min+(e.second?', doppia ammonizione':'')+')'),10.5,false,2);
-    const subs=E.filter(e=>e.type==='sub');
-    w.t('Sostituzioni: '+T.subs+'/'+M.maxSubs+(M.slotsOn?'    Slot: '+T.slots+'/'+M.maxSlots:''),10.5,true,2);
-    if(!subs.length)w.t('nessuna',10.5,false,6);
-    const groups=[];for(const s of subs){const key=s.slot===undefined?'x'+groups.length:String(s.slot);
-      let g=groups.find(g=>g.key===key&&key!=='x');if(!g){g={key,slot:s.slot,items:[]};groups.push(g)}g.items.push(s)}
-    for(const g of groups){const lab=g.slot==='INT'?'Intervallo':typeof g.slot==='number'?'Slot '+g.slot+' ('+g.items[0].min+')':g.items[0].min;
-      w.t(lab+': '+g.items.map(s=>'entra '+s.in+' per '+s.out+(typeof g.slot==='number'&&s.min!==g.items[0].min?' ('+s.min+')':'')).join('; '),10.5,false,6)}}
+  for(const rep of[R.us,R.them]){const w=rep===R.us?wl:wr;
+    w.t(rep.name+' ('+rep.tag+')',13,true);w.sp(1);
+    w.t('Marcatori: '+rep.marcatori,10.5,false,2);
+    if(rep.autogol)w.t('Autogol: '+rep.autogol,10.5,false,2);
+    w.t('Ammoniti: '+rep.ammoniti,10.5,false,2);
+    w.t('Espulsi: '+rep.espulsi,10.5,false,2);
+    w.t(rep.subsLabel,10.5,true,2);
+    if(!rep.subsGroups.length)w.t('nessuna',10.5,false,6);
+    for(const g of rep.subsGroups)w.t(g.label+': '+g.text,10.5,false,6)}
   y=Math.max(wl.y,wr.y)+3;hr();
   t('Cronologia',13,true);y+=1;
-  const phases=M.events.filter(e=>e.type==='phase');
-  if(phases.length)t(phases.map(e=>e.min+' '+desc(e)).join('  ·  '),10,false,2);
+  if(R.fasi)t(R.fasi,10,false,2);
   y+=1;
   const wl2=writer(xL,y),wr2=writer(xR,y);
-  for(const[k,w]of[['us',wl2],['them',wr2]]){
-    w.t(tn(k),11,true);
-    const evs=M.events.filter(e=>e.team===k&&e.type!=='slotclose');
-    if(!evs.length)w.t('nessun evento',10,false,2);
-    for(const e of evs)w.t(e.min+'  '+desc(e),10,false,2)}
+  for(const rep of[R.us,R.them]){const w=rep===R.us?wl2:wr2;
+    w.t(rep.name,11,true);
+    if(!rep.cronologia.length)w.t('nessun evento',10,false,2);
+    for(const e of rep.cronologia)w.t(e.min+'  '+e.text,10,false,2)}
   y=Math.max(wl2.y,wr2.y);
   y+=4;d.setTextColor(120);t('Compilato il '+new Date().toLocaleString('it-IT'),8.5);
   const safe=s=>s.replace(/[^\w\-]+/g,'_');
-  const fname='Referto_'+safe(tn(hk))+'_'+safe(tn(ak))+'_'+M.date+'.pdf';
+  const fname='Referto_'+safe(R.us.name)+'_'+safe(R.them.name)+'_'+M.date+'.pdf';
   const blob=d.output('blob');let file=null;try{file=new File([blob],fname,{type:'application/pdf'})}catch(e){}
-  const text='Referto '+tn(hk)+' - '+tn(ak)+' del '+itDate(M.date);
+  const text='Referto '+R.titolo+' del '+R.data;
   if(file&&navigator.canShare&&navigator.canShare({files:[file]})){
     try{await navigator.share({files:[file],title:fname,text});M.pdfDone=true;store(LS_MATCH,M);return}
     catch(e){if(e&&e.name==='AbortError')return}}
@@ -580,6 +650,7 @@ $('btnStart').onclick=()=>{readSettings();
 
 $('btnMenu').onclick=()=>{$('menuMeta').textContent=M?(M.home?M.us+' - '+M.opp:M.opp+' - '+M.us)+', '+itDate(M.date):'';$('menu').classList.add('on')};
 $('menuClose').onclick=()=>$('menu').classList.remove('on');
+$('mRiepilogo').onclick=()=>{$('menu').classList.remove('on');showRiepilogo()};
 $('mPdf').onclick=()=>{$('menu').classList.remove('on');makePDF()};
 $('mSet').onclick=()=>{$('menu').classList.remove('on');showSetup(true)};
 $('mChrono').onclick=()=>{const ul=$('chronoList');
@@ -605,7 +676,7 @@ bp.addEventListener('pointerdown',()=>{if(!C||C.phase==='END'||bp.classList.cont
   bp.classList.add('hold');lp=setTimeout(()=>{bp.classList.remove('hold');nextPhase()},700)});
 ['pointerup','pointerleave','pointercancel'].forEach(ev=>bp.addEventListener(ev,()=>{clearTimeout(lp);bp.classList.remove('hold')}));
 bp.addEventListener('contextmenu',e=>e.preventDefault());
-bp.addEventListener('click',()=>{if(C&&C.phase==='END')makePDF();else if(bp.classList.contains('locked'))toast('Il tempo si può chiudere solo dopo '+M.half+' minuti')});
+bp.addEventListener('click',()=>{if(C&&C.phase==='END')showRiepilogo();else if(bp.classList.contains('locked'))toast('Il tempo si può chiudere solo dopo '+M.half+' minuti')});
 
 /* ---------- schermo acceso ---------- */
 let wl=null;
