@@ -295,7 +295,7 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 'use strict';
 const $=id=>document.getElementById(id);
 const LS_SET='referto_settings_v1', LS_MATCH='referto_match_v1';
-const APP_VERSION='2026.09.25.1';
+const APP_VERSION='2026.09.26.1';
 const SLOT_WINDOW=120000;
 
 function load(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}}
@@ -483,25 +483,28 @@ function nextPhase(){const el=elNow(),h=H();
 
 /* ---------- PDF ---------- */
 /* ---------- dati referto (condivisi da anteprima e PDF) ---------- */
+function repDesc(e){if(e.type==='sub')return 'Esce '+e.out+', entra '+e.in+(e.slot==='INT'?' (intervallo)':typeof e.slot==='number'?' (slot '+e.slot+')':'');
+  return desc(e)}
 function reportData(){
   const hk=M.home?'us':'them',ak=oth(hk);
   const ev=k=>M.events.filter(e=>e.team===k);
   const list=(arr,f)=>arr.length?arr.map(f).join(', '):'nessuno';
   function block(k){const E=ev(k),T=C.T[k];
-    const og=E.filter(e=>e.type==='og');
     const subs=E.filter(e=>e.type==='sub');
     const groups=[];for(const s of subs){const key=s.slot===undefined?'x'+groups.length:String(s.slot);
       let g=groups.find(g=>g.key===key&&key!=='x');if(!g){g={key,slot:s.slot,items:[]};groups.push(g)}g.items.push(s)}
+    const scorers=E.filter(e=>e.type==='goal').map(e=>({ts:e.ts,txt:'n.'+e.num+' ('+e.min+')'}));
+    const ogFor=M.events.filter(e=>e.type==='og'&&e.team===oth(k)).map(e=>({ts:e.ts,txt:'n.'+e.num+' ('+e.min+', autogol)'}));
+    const allScorers=scorers.concat(ogFor).sort((a,b)=>a.ts-b.ts);
     return{
       name:tn(k),tag:k===hk?'casa':'ospiti',
-      marcatori:list(E.filter(e=>e.type==='goal'),e=>'n.'+e.num+' ('+e.min+')'),
-      autogol:og.length?list(og,e=>'n.'+e.num+' ('+e.min+')'):null,
+      marcatori:allScorers.length?allScorers.map(s=>s.txt).join(', '):'nessuno',
       ammoniti:list(E.filter(e=>e.type==='yellow'&&!e.second),e=>'n.'+e.num+' ('+e.min+')'),
       espulsi:list(E.filter(e=>e.type==='red'||(e.type==='yellow'&&e.second)),e=>'n.'+e.num+' ('+e.min+(e.second?', doppia ammonizione':'')+')'),
       subsLabel:'Sostituzioni: '+T.subs+'/'+M.maxSubs+(M.slotsOn?'    Slot: '+T.slots+'/'+M.maxSlots:''),
       subsGroups:groups.map(g=>({label:g.slot==='INT'?'Intervallo':typeof g.slot==='number'?'Slot '+g.slot+' ('+g.items[0].min+')':g.items[0].min,
-        text:g.items.map(s=>'entra '+s.in+' per '+s.out+(typeof g.slot==='number'&&s.min!==g.items[0].min?' ('+s.min+')':'')).join('; ')})),
-      cronologia:M.events.filter(e=>e.team===k&&e.type!=='slotclose').map(e=>({min:e.min,text:desc(e)}))
+        text:g.items.map(s=>'esce '+s.out+', entra '+s.in+(typeof g.slot==='number'&&s.min!==g.items[0].min?' ('+s.min+')':'')).join('; ')})),
+      cronologia:M.events.filter(e=>e.team===k&&e.type!=='slotclose').map(e=>({min:e.min,text:repDesc(e)}))
     }}
   return{hk,ak,titolo:tn(hk)+' - '+tn(ak),data:itDate(M.date),
     risultato:C.T[hk].goals+' - '+C.T[ak].goals+(C.forced?' (partita terminata in anticipo)':''),
@@ -513,7 +516,6 @@ function reportData(){
 function repBlock(rep){
   let h='<div class="repTeam">'+esc(rep.name)+' ('+rep.tag+')</div>';
   h+='<div class="repLine"><b>Marcatori:</b> '+esc(rep.marcatori)+'</div>';
-  if(rep.autogol)h+='<div class="repLine"><b>Autogol:</b> '+esc(rep.autogol)+'</div>';
   h+='<div class="repLine"><b>Ammoniti:</b> '+esc(rep.ammoniti)+'</div>';
   h+='<div class="repLine"><b>Espulsi:</b> '+esc(rep.espulsi)+'</div>';
   h+='<div class="repLine repSubHead">'+esc(rep.subsLabel)+'</div>';
@@ -562,7 +564,6 @@ async function makePDF(){
   for(const rep of[R.us,R.them]){const w=rep===R.us?wl:wr;
     w.t(rep.name+' ('+rep.tag+')',13,true);w.sp(1);
     w.t('Marcatori: '+rep.marcatori,10.5,false,2);
-    if(rep.autogol)w.t('Autogol: '+rep.autogol,10.5,false,2);
     w.t('Ammoniti: '+rep.ammoniti,10.5,false,2);
     w.t('Espulsi: '+rep.espulsi,10.5,false,2);
     w.t(rep.subsLabel,10.5,true,2);
