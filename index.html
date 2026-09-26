@@ -106,6 +106,8 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 .gap{display:block}
 .num{border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;
   font-family:var(--num);font-weight:800;font-size:23px;position:relative}
+.num.numEdit{outline:2px dashed currentColor;outline-offset:2px;cursor:pointer}
+.num.numEdit:active{transform:scale(.94)}
 .side.us .field .num{background:var(--us);color:#fff}
 .side.them .field .num{background:var(--them);color:#fff}
 .side.us .bench .num{border:2px solid var(--us);color:var(--us);font-size:19px}
@@ -202,18 +204,22 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 #dlg .btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 #dlg button{height:48px;border-radius:12px;font-weight:600;border:1px solid var(--line)}
 #dlg #dlgOk{background:var(--ink);color:var(--bg);border:0}
-#editDlg{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:20px}
-#editDlg.on{display:flex}
-#editDlg .box{background:var(--surface);border-radius:16px;padding:18px;max-width:380px;width:100%;max-height:86vh;overflow-y:auto}
-#editDlg h2{margin:0 0 14px;font-size:18px}
-#editDlg .fld{display:block;margin-bottom:12px}
-#editDlg .fld>span{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
-#editDlg input{width:100%;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);
+.miniModal{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:20px}
+.miniModal.on{display:flex}
+.miniModal .box{background:var(--surface);border-radius:16px;padding:18px;max-width:380px;width:100%;max-height:86vh;overflow-y:auto}
+.miniModal h2{margin:0 0 14px;font-size:18px}
+.miniModal .fld{display:block;margin-bottom:12px}
+.miniModal .fld>span{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+.miniModal input{width:100%;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);
   padding:0 12px;font-size:16px;-webkit-user-select:text;user-select:text}
-#editDlg .btns2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
-#editDlg .btns2 button{height:46px;border-radius:12px;font-weight:600;border:1px solid var(--line)}
-#editDlg #editSave{background:var(--ink);color:var(--bg);border:0;grid-column:1/-1}
-#editDlg #editDel{color:var(--red)}
+.miniModal .note{margin:-4px 0 12px}
+.miniModal .btns2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.miniModal .btns2 button{height:46px;border-radius:12px;font-weight:600;border:1px solid var(--line)}
+.miniModal .btns2 .primary{background:var(--ink);color:var(--bg);border:0}
+.miniModal .btns3{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.miniModal .btns3 button{height:46px;border-radius:12px;font-weight:600;border:1px solid var(--line)}
+.miniModal .btns3 .primary{background:var(--ink);color:var(--bg);border:0;grid-column:1/-1}
+.miniModal .btns3 .danger{color:var(--red)}
 @media (prefers-reduced-motion: reduce){.pick .hint{animation:none}.phase.hold .fill{transition:none}}
 @media (max-width:360px){.row{grid-template-columns:repeat(4,1fr) 38px}.side.them .row{grid-template-columns:38px repeat(4,1fr)}.ic svg{width:18px;height:18px}.num{font-size:22px}}
 </style>
@@ -297,13 +303,24 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 </div></div>
 
 <!-- modifica evento -->
-<div id="editDlg"><div class="box">
+<div id="editDlg" class="miniModal"><div class="box">
   <h2>Modifica evento</h2>
   <div id="editFields"></div>
-  <div class="btns2">
+  <div class="btns3">
     <button id="editDel" class="danger">Elimina evento</button>
     <button id="editCancel">Annulla</button>
-    <button id="editSave">Salva modifiche</button>
+    <button id="editSave" class="primary">Salva modifiche</button>
+  </div>
+</div></div>
+
+<!-- numero di maglia -->
+<div id="numDlg" class="miniModal"><div class="box">
+  <h2>Cambia numero di maglia</h2>
+  <p class="note" id="numDlgNote"></p>
+  <label class="fld"><span>Nuovo numero</span><input type="number" id="numInput" min="1" max="99" inputmode="numeric"></label>
+  <div class="btns2">
+    <button id="numCancel">Annulla</button>
+    <button id="numSave" class="primary">Salva</button>
   </div>
 </div></div>
 
@@ -322,7 +339,7 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 'use strict';
 const $=id=>document.getElementById(id);
 const LS_SET='referto_settings_v1', LS_MATCH='referto_match_v1';
-const APP_VERSION='2026.09.26.2';
+const APP_VERSION='2026.09.26.3';
 const SLOT_WINDOW=120000;
 
 function load(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}}
@@ -358,10 +375,13 @@ function ask(msg,ok){return new Promise(res=>{$('dlgMsg').textContent=msg;$('dlg
   $('dlgOk').onclick=()=>{$('dlg').classList.remove('on');res(true)};$('dlgNo').onclick=()=>{$('dlg').classList.remove('on');res(false)}})}
 
 /* ---------- ricostruzione stato dagli eventi ---------- */
-function newTeam(){const p={};for(let i=1;i<=20;i++)p[i]={y:0,r:false,g:0,og:0};
-  return {field:[1,2,3,4,5,6,7,8,9,10,11],bench:[12,13,14,15,16,17,18,19,20],out:[],p,goals:0,subs:0,slots:0,open:null}}
+function defRoster(){return{field:[1,2,3,4,5,6,7,8,9,10,11],bench:[12,13,14,15,16,17,18,19,20]}}
+function ensureRoster(){if(M&&!M.roster)M.roster={us:defRoster(),them:defRoster()}}
+function newTeam(roster){const p={};for(let i=1;i<=99;i++)p[i]={y:0,r:false,g:0,og:0};
+  return {field:roster.field.slice(),bench:roster.bench.slice(),out:[],p,goals:0,subs:0,slots:0,open:null}}
 function compute(){
-  const c={phase:'pre',t:{},T:{us:newTeam(),them:newTeam()},forced:false};
+  ensureRoster();
+  const c={phase:'pre',t:{},T:{us:newTeam(M.roster.us),them:newTeam(M.roster.them)},forced:false};
   for(const e of M.events){
     const T=e.team?c.T[e.team]:null;
     switch(e.type){
@@ -409,7 +429,8 @@ function desc(e){switch(e.type){
 function numCell(k,n){const p=C.T[k].p[n];let b='';
   for(let i=0;i<p.g;i++)b+='<i class="g"></i>';for(let i=0;i<p.og;i++)b+='<i class="o"></i>';
   if(p.y)b+='<i class="y"></i>';if(p.y>1)b+='<i class="y"></i>';if(p.r)b+='<i class="r"></i>';
-  return '<div class="num">'+n+'<span class="bd">'+b+'</span></div>'}
+  const editable=C.phase==='pre';
+  return '<div class="num'+(editable?' numEdit':'')+'"'+(editable?' data-a="editnum"':'')+'>'+n+'<span class="bd">'+b+'</span></div>'}
 function row(k,cls,acts,n,extra){const num=numCell(k,n);
   return '<div class="row '+cls+'" data-t="'+k+'" data-n="'+n+'"'+(extra||'')+'>'+(k==='us'?acts+num:num+acts)+'</div>'}
 function btns(k,list){const s=k==='us'?list:list.slice().reverse();return s.join('')}
@@ -480,6 +501,7 @@ function tick(){
 async function act(a,k,n){
   const T=C.T[k];
   if(a==='closeslot'){push({type:'slotclose',team:k});toast('Slot chiuso, '+tn(k));return}
+  if(a==='editnum'){openEditNum(k,n);return}
   if(a==='pickout'){if(!mode)return;const e={type:'sub',team:k,in:mode.in,out:n};
     if(C.phase==='INT')e.slot='INT';else if(M.slotsOn){const o=openSlot(k);e.slot=o?o.slot:T.slots+1}
     mode=null;push(e);toast('Entra '+e.in+', esce '+n+(e.slot==='INT'?', intervallo':e.slot?', slot '+e.slot:''));return}
@@ -735,6 +757,30 @@ $('editSave').onclick=()=>{
   const min=$('edMin').value.trim();if(min)e.min=min;
   store(LS_MATCH,M);C=compute();render();
   closeEditEvent();renderChronoList();toast('Evento modificato')};
+
+/* ---------- numero di maglia (solo prima dell'inizio) ---------- */
+let numEditCtx=null;
+function openEditNum(k,n){
+  if(C.phase!=='pre'){toast('Il numero si può cambiare solo prima dell\'inizio della partita');return}
+  const T=C.T[k];
+  const arrName=T.field.includes(n)?'field':T.bench.includes(n)?'bench':null;
+  if(!arrName)return;
+  numEditCtx={k,oldNum:n,arrName,idx:T[arrName].indexOf(n)};
+  $('numDlgNote').textContent=tn(k)+' — '+(arrName==='field'?'titolare':'riserva');
+  $('numInput').value=n;
+  $('numDlg').classList.add('on')}
+$('numCancel').onclick=()=>{$('numDlg').classList.remove('on');numEditCtx=null};
+$('numSave').onclick=()=>{
+  if(!numEditCtx)return;
+  const nn=parseInt($('numInput').value,10);
+  if(!nn||nn<1||nn>99){toast('Numero non valido');return}
+  const{k,oldNum,arrName,idx}=numEditCtx;
+  const roster=M.roster[k];
+  if(nn!==oldNum&&roster.field.concat(roster.bench).includes(nn)){toast('Numero '+nn+' già usato in questa squadra');return}
+  roster[arrName][idx]=nn;
+  store(LS_MATCH,M);C=compute();render();
+  $('numDlg').classList.remove('on');numEditCtx=null;
+  toast('Numero '+oldNum+' cambiato in '+nn)};
 $('mEnd').onclick=async()=>{if(C.phase==='END'){toast('La partita è già terminata');return}
   if(C.phase==='pre'){toast('La partita non è ancora iniziata');return}
   $('menu').classList.remove('on');
