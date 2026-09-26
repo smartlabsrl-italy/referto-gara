@@ -181,6 +181,9 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 .chrono{padding:0;margin:0}
 .chrono b{font-family:var(--num);font-size:18px}
 .chrono .u{color:var(--us);font-weight:600} .chrono .h{color:var(--them);font-weight:600}
+.chrono li.editable{cursor:pointer}
+.chrono li.editable:active{background:var(--pick)}
+.chrono .editHint{display:block;font-size:11.5px;color:var(--muted);font-weight:400}
 .repHead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-weight:700;font-size:16px}
 .repHead span:last-child{font-weight:500;font-size:13px;color:var(--muted);white-space:nowrap}
 .repRes{font-weight:700;font-size:15px;margin:4px 0 14px}
@@ -199,6 +202,18 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 #dlg .btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 #dlg button{height:48px;border-radius:12px;font-weight:600;border:1px solid var(--line)}
 #dlg #dlgOk{background:var(--ink);color:var(--bg);border:0}
+#editDlg{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:20px}
+#editDlg.on{display:flex}
+#editDlg .box{background:var(--surface);border-radius:16px;padding:18px;max-width:380px;width:100%;max-height:86vh;overflow-y:auto}
+#editDlg h2{margin:0 0 14px;font-size:18px}
+#editDlg .fld{display:block;margin-bottom:12px}
+#editDlg .fld>span{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+#editDlg input{width:100%;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);
+  padding:0 12px;font-size:16px;-webkit-user-select:text;user-select:text}
+#editDlg .btns2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+#editDlg .btns2 button{height:46px;border-radius:12px;font-weight:600;border:1px solid var(--line)}
+#editDlg #editSave{background:var(--ink);color:var(--bg);border:0;grid-column:1/-1}
+#editDlg #editDel{color:var(--red)}
 @media (prefers-reduced-motion: reduce){.pick .hint{animation:none}.phase.hold .fill{transition:none}}
 @media (max-width:360px){.row{grid-template-columns:repeat(4,1fr) 38px}.side.them .row{grid-template-columns:38px repeat(4,1fr)}.ic svg{width:18px;height:18px}.num{font-size:22px}}
 </style>
@@ -277,7 +292,19 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 <div class="ov" id="chrono"><div class="wrap">
   <button class="close" id="chronoClose">Chiudi</button>
   <h1>Cronologia</h1>
+  <p class="note">Tocca un evento per correggere il numero o il minuto, o per eliminarlo.</p>
   <ul class="chrono" id="chronoList"></ul>
+</div></div>
+
+<!-- modifica evento -->
+<div id="editDlg"><div class="box">
+  <h2>Modifica evento</h2>
+  <div id="editFields"></div>
+  <div class="btns2">
+    <button id="editDel" class="danger">Elimina evento</button>
+    <button id="editCancel">Annulla</button>
+    <button id="editSave">Salva modifiche</button>
+  </div>
 </div></div>
 
 <!-- riepilogo -->
@@ -295,7 +322,7 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 'use strict';
 const $=id=>document.getElementById(id);
 const LS_SET='referto_settings_v1', LS_MATCH='referto_match_v1';
-const APP_VERSION='2026.09.26.1';
+const APP_VERSION='2026.09.26.2';
 const SLOT_WINDOW=120000;
 
 function load(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}}
@@ -654,11 +681,60 @@ $('menuClose').onclick=()=>$('menu').classList.remove('on');
 $('mRiepilogo').onclick=()=>{$('menu').classList.remove('on');showRiepilogo()};
 $('mPdf').onclick=()=>{$('menu').classList.remove('on');makePDF()};
 $('mSet').onclick=()=>{$('menu').classList.remove('on');showSetup(true)};
-$('mChrono').onclick=()=>{const ul=$('chronoList');
-  ul.innerHTML=M.events.length?M.events.slice().reverse().map(e=>'<li><b>'+(e.type==='phase'?'':e.min)+'</b><span>'+
-    (e.team?'<span class="'+(e.team==='us'?'u':'h')+'">'+esc(tn(e.team))+'</span> ':'')+esc(desc(e))+'</span></li>').join(''):'<li><b></b><span>Nessun evento registrato.</span></li>';
-  $('menu').classList.remove('on');$('chrono').classList.add('on')};
+const EDITABLE_EV=new Set(['goal','og','yellow','red','sub']);
+function renderChronoList(){
+  const ul=$('chronoList');
+  if(!M.events.length){ul.innerHTML='<li><b></b><span>Nessun evento registrato.</span></li>';return}
+  ul.innerHTML=M.events.map((e,i)=>({e,i})).reverse().map(({e,i})=>{
+    const editable=EDITABLE_EV.has(e.type);
+    return '<li'+(editable?' class="editable" data-idx="'+i+'"':'')+'><b>'+(e.type==='phase'?'':e.min)+'</b><span>'+
+      (e.team?'<span class="'+(e.team==='us'?'u':'h')+'">'+esc(tn(e.team))+'</span> ':'')+esc(desc(e))+
+      (editable?'<span class="editHint">Tocca per correggere o eliminare</span>':'')+'</span></li>'
+  }).join('')}
+$('mChrono').onclick=()=>{renderChronoList();$('menu').classList.remove('on');$('chrono').classList.add('on')};
 $('chronoClose').onclick=()=>$('chrono').classList.remove('on');
+$('chronoList').addEventListener('click',ev=>{
+  const li=ev.target.closest('li[data-idx]');if(!li)return;
+  openEditEvent(parseInt(li.dataset.idx,10))});
+
+/* ---------- modifica evento ---------- */
+let editIdx=null;
+function openEditEvent(idx){
+  const e=M.events[idx];if(!e||!EDITABLE_EV.has(e.type))return;
+  editIdx=idx;let h='';
+  if(e.type==='sub'){
+    h+='<label class="fld"><span>Esce (numero)</span><input type="number" id="edOut" min="1" max="99" inputmode="numeric" value="'+e.out+'"></label>';
+    h+='<label class="fld"><span>Entra (numero)</span><input type="number" id="edIn" min="1" max="99" inputmode="numeric" value="'+e.in+'"></label>';
+  }else{
+    const lbl=e.type==='goal'?'Numero di chi ha segnato':e.type==='og'?'Numero di chi ha segnato nella propria porta':
+      e.type==='yellow'?'Numero ammonito':'Numero espulso';
+    h+='<label class="fld"><span>'+lbl+'</span><input type="number" id="edNum" min="1" max="99" inputmode="numeric" value="'+e.num+'"></label>';
+  }
+  h+='<label class="fld"><span>Minuto (es. 23\' oppure 45+2\')</span><input type="text" id="edMin" autocomplete="off" value="'+esc(e.min||'')+'"></label>';
+  $('editFields').innerHTML=h;
+  $('editDlg').classList.add('on')}
+function closeEditEvent(){$('editDlg').classList.remove('on');editIdx=null}
+$('editCancel').onclick=closeEditEvent;
+$('editDel').onclick=async()=>{
+  if(editIdx===null)return;
+  if(await ask('Eliminare definitivamente questo evento dalla cronologia?','Elimina')){
+    M.events.splice(editIdx,1);store(LS_MATCH,M);C=compute();render();
+    closeEditEvent();renderChronoList();toast('Evento eliminato')}};
+$('editSave').onclick=()=>{
+  if(editIdx===null)return;
+  const e=M.events[editIdx];
+  if(e.type==='sub'){
+    const out=parseInt($('edOut').value,10),inn=parseInt($('edIn').value,10);
+    if(!out||!inn){toast('Numeri non validi');return}
+    e.out=out;e.in=inn;
+  }else{
+    const n=parseInt($('edNum').value,10);
+    if(!n){toast('Numero non valido');return}
+    e.num=n;
+  }
+  const min=$('edMin').value.trim();if(min)e.min=min;
+  store(LS_MATCH,M);C=compute();render();
+  closeEditEvent();renderChronoList();toast('Evento modificato')};
 $('mEnd').onclick=async()=>{if(C.phase==='END'){toast('La partita è già terminata');return}
   if(C.phase==='pre'){toast('La partita non è ancora iniziata');return}
   $('menu').classList.remove('on');
