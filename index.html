@@ -339,7 +339,7 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 'use strict';
 const $=id=>document.getElementById(id);
 const LS_SET='referto_settings_v1', LS_MATCH='referto_match_v1';
-const APP_VERSION='2026.09.26.3';
+const APP_VERSION='2026.09.26.4';
 const SLOT_WINDOW=120000;
 
 function load(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}}
@@ -534,6 +534,16 @@ function nextPhase(){const el=elNow(),h=H();
 /* ---------- dati referto (condivisi da anteprima e PDF) ---------- */
 function repDesc(e){if(e.type==='sub')return 'Esce '+e.out+', entra '+e.in+(e.slot==='INT'?' (intervallo)':typeof e.slot==='number'?' (slot '+e.slot+')':'');
   return desc(e)}
+function phaseSummary(){
+  const pf=type=>M.events.find(e=>e.type==='phase'&&e.to===type);
+  const e1=pf('1T'),eInt=pf('INT'),e2=pf('2T'),eEnd=pf('END');
+  const mins=ms=>Math.round(ms/60000);
+  const lines=[];
+  if(e1){const endTs=eInt?eInt.ts:(eEnd?eEnd.ts:null);
+    lines.push('Durata 1° tempo: '+(endTs?mins(endTs-e1.ts)+' minuti':'in corso'))}
+  if(e2)lines.push('Durata 2° tempo: '+(eEnd?mins(eEnd.ts-e2.ts)+' minuti':'in corso'));
+  else if(eEnd)lines.push('Durata 2° tempo: non disputato');
+  return lines}
 function reportData(){
   const hk=M.home?'us':'them',ak=oth(hk);
   const ev=k=>M.events.filter(e=>e.team===k);
@@ -557,7 +567,7 @@ function reportData(){
     }}
   return{hk,ak,titolo:tn(hk)+' - '+tn(ak),data:itDate(M.date),
     risultato:C.T[hk].goals+' - '+C.T[ak].goals+(C.forced?' (partita terminata in anticipo)':''),
-    fasi:M.events.filter(e=>e.type==='phase').map(e=>e.min+' '+desc(e)).join('  ·  '),
+    fasi:phaseSummary(),
     us:block('us'),them:block('them')}
 }
 
@@ -583,7 +593,7 @@ function showRiepilogo(){
   h+='<div class="repRes">Risultato: '+esc(R.risultato)+'</div>';
   h+='<div class="repCols"><div class="col us">'+repBlock(R.us)+'</div><div class="col them">'+repBlock(R.them)+'</div></div>';
   h+='<h2>Cronologia</h2>';
-  if(R.fasi)h+='<div class="repLine repFasi">'+esc(R.fasi)+'</div>';
+  if(R.fasi.length)h+=R.fasi.map(l=>'<div class="repLine repFasi">'+esc(l)+'</div>').join('');
   h+='<div class="repCols"><div class="col us">'+repCrono(R.us)+'</div><div class="col them">'+repCrono(R.them)+'</div></div>';
   $('riepilogoBody').innerHTML=h;
   $('menu').classList.remove('on');$('riepilogo').classList.add('on')}
@@ -620,7 +630,7 @@ async function makePDF(){
     for(const g of rep.subsGroups)w.t(g.label+': '+g.text,10.5,false,6)}
   y=Math.max(wl.y,wr.y)+3;hr();
   t('Cronologia',13,true);y+=1;
-  if(R.fasi)t(R.fasi,10,false,2);
+  for(const l of R.fasi)t(l,10,false,2);
   y+=1;
   const wl2=writer(xL,y),wr2=writer(xR,y);
   for(const rep of[R.us,R.them]){const w=rep===R.us?wl2:wr2;
