@@ -186,14 +186,14 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 .chrono li.editable{cursor:pointer}
 .chrono li.editable:active{background:var(--pick)}
 .chrono .editHint{display:block;font-size:11.5px;color:var(--muted);font-weight:400}
-.repHead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-weight:700;font-size:16px}
-.repHead span:last-child{font-weight:500;font-size:13px;color:var(--muted);white-space:nowrap}
-.repRes{font-weight:700;font-size:15px;margin:4px 0 14px}
+.repHead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-weight:700;font-size:18px}
+.repHead span:last-child{font-weight:500;font-size:14.5px;color:var(--muted);white-space:nowrap}
+.repRes{font-weight:700;font-size:17px;margin:4px 0 14px}
 .repCols{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}
-.repTeam{font-weight:700;font-size:13.5px;margin-bottom:4px}
+.repTeam{font-weight:700;font-size:15.5px;margin-bottom:4px}
 .col.us .repTeam{color:var(--us)}
 .col.them .repTeam{color:var(--them)}
-.repLine{font-size:12.5px;line-height:1.5;word-break:break-word}
+.repLine{font-size:14.5px;line-height:1.5;word-break:break-word}
 .repSubHead{font-weight:600;margin-top:4px}
 .repSub{padding-left:6px}
 .repFasi{color:var(--muted);margin-bottom:8px}
@@ -339,7 +339,7 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 'use strict';
 const $=id=>document.getElementById(id);
 const LS_SET='referto_settings_v1', LS_MATCH='referto_match_v1';
-const APP_VERSION='2026.09.26.4';
+const APP_VERSION='2026.10.04.1';
 const SLOT_WINDOW=120000;
 
 function load(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}}
@@ -544,25 +544,30 @@ function phaseSummary(){
   if(e2)lines.push('Durata 2° tempo: '+(eEnd?mins(eEnd.ts-e2.ts)+' minuti':'in corso'));
   else if(eEnd)lines.push('Durata 2° tempo: non disputato');
   return lines}
+function subHalfMin(e){
+  if(e.phase!=='1T'&&e.phase!=='2T')return null;
+  const h=M.half,H=h*60000,el=e.el||0;
+  return el<H?String(Math.floor(el/60000)+1):(h+'+'+(Math.floor((el-H)/60000)+1))}
 function reportData(){
   const hk=M.home?'us':'them',ak=oth(hk);
   const ev=k=>M.events.filter(e=>e.team===k);
-  const list=(arr,f)=>arr.length?arr.map(f).join(', '):'nessuno';
   function block(k){const E=ev(k),T=C.T[k];
     const subs=E.filter(e=>e.type==='sub');
     const groups=[];for(const s of subs){const key=s.slot===undefined?'x'+groups.length:String(s.slot);
       let g=groups.find(g=>g.key===key&&key!=='x');if(!g){g={key,slot:s.slot,items:[]};groups.push(g)}g.items.push(s)}
     const scorers=E.filter(e=>e.type==='goal').map(e=>({ts:e.ts,txt:'n.'+e.num+' ('+e.min+')'}));
     const ogFor=M.events.filter(e=>e.type==='og'&&e.team===oth(k)).map(e=>({ts:e.ts,txt:'n.'+e.num+' ('+e.min+', autogol)'}));
-    const allScorers=scorers.concat(ogFor).sort((a,b)=>a.ts-b.ts);
+    const allScorers=scorers.concat(ogFor).sort((a,b)=>a.ts-b.ts).map(s=>s.txt);
     return{
       name:tn(k),tag:k===hk?'casa':'ospiti',
-      marcatori:allScorers.length?allScorers.map(s=>s.txt).join(', '):'nessuno',
-      ammoniti:list(E.filter(e=>e.type==='yellow'&&!e.second),e=>'n.'+e.num+' ('+e.min+')'),
-      espulsi:list(E.filter(e=>e.type==='red'||(e.type==='yellow'&&e.second)),e=>'n.'+e.num+' ('+e.min+(e.second?', doppia ammonizione':'')+')'),
+      marcatori:allScorers,
+      ammoniti:E.filter(e=>e.type==='yellow'&&!e.second).map(e=>'n.'+e.num+' ('+e.min+')'),
+      espulsi:E.filter(e=>e.type==='red'||(e.type==='yellow'&&e.second)).map(e=>'n.'+e.num+' ('+e.min+(e.second?', doppia ammonizione':'')+')'),
       subsLabel:'Sostituzioni: '+T.subs+'/'+M.maxSubs+(M.slotsOn?'    Slot: '+T.slots+'/'+M.maxSlots:''),
-      subsGroups:groups.map(g=>({label:g.slot==='INT'?'Intervallo':typeof g.slot==='number'?'Slot '+g.slot+' ('+g.items[0].min+')':g.items[0].min,
-        text:g.items.map(s=>'esce '+s.out+', entra '+s.in+(typeof g.slot==='number'&&s.min!==g.items[0].min?' ('+s.min+')':'')).join('; ')})),
+      subsGroups:groups.map(g=>({label:g.slot==='INT'?'Intervallo':typeof g.slot==='number'?'Slot '+g.slot:g.items[0].min,
+        lines:g.items.map(s=>{const hm=subHalfMin(s);
+          return hm?('Al '+hm+' del '+(s.phase==='1T'?'1°':'2°')+' tempo esce il '+s.out+' entra il '+s.in)
+                    :('Esce il '+s.out+', entra il '+s.in)})})),
       cronologia:M.events.filter(e=>e.team===k&&e.type!=='slotclose').map(e=>({min:e.min,text:repDesc(e)}))
     }}
   return{hk,ak,titolo:tn(hk)+' - '+tn(ak),data:itDate(M.date),
@@ -572,14 +577,21 @@ function reportData(){
 }
 
 /* ---------- anteprima a schermo ---------- */
+function repList(label,arr){
+  if(!arr.length)return '<div class="repLine"><b>'+label+':</b> nessuno</div>';
+  let h='<div class="repLine"><b>'+label+':</b></div>';
+  for(const item of arr)h+='<div class="repLine repSub">'+esc(item)+'</div>';
+  return h}
 function repBlock(rep){
   let h='<div class="repTeam">'+esc(rep.name)+' ('+rep.tag+')</div>';
-  h+='<div class="repLine"><b>Marcatori:</b> '+esc(rep.marcatori)+'</div>';
-  h+='<div class="repLine"><b>Ammoniti:</b> '+esc(rep.ammoniti)+'</div>';
-  h+='<div class="repLine"><b>Espulsi:</b> '+esc(rep.espulsi)+'</div>';
+  h+=repList('Marcatori',rep.marcatori);
+  h+=repList('Ammoniti',rep.ammoniti);
+  h+=repList('Espulsi',rep.espulsi);
   h+='<div class="repLine repSubHead">'+esc(rep.subsLabel)+'</div>';
   if(!rep.subsGroups.length)h+='<div class="repLine repSub">nessuna</div>';
-  for(const g of rep.subsGroups)h+='<div class="repLine repSub">'+esc(g.label)+': '+esc(g.text)+'</div>';
+  for(const g of rep.subsGroups){
+    h+='<div class="repLine repSubHead">'+esc(g.label)+'</div>';
+    for(const line of g.lines)h+='<div class="repLine repSub">'+esc(line)+'</div>'}
   return h}
 function repCrono(rep){
   let h='<div class="repTeam">'+esc(rep.name)+'</div>';
@@ -619,15 +631,20 @@ async function makePDF(){
   y+=14*0.42+2.5;
   t('Risultato finale: '+R.risultato,12.5,true);
   y+=2;hr();
+  function listPDF(w,label,arr){
+    if(!arr.length){w.t(label+': nessuno',10.5,false,2);return}
+    w.t(label+':',10.5,false,2);
+    for(const item of arr)w.t(item,10.5,false,6)}
   const wl=writer(xL,y),wr=writer(xR,y);
   for(const rep of[R.us,R.them]){const w=rep===R.us?wl:wr;
     w.t(rep.name+' ('+rep.tag+')',13,true);w.sp(1);
-    w.t('Marcatori: '+rep.marcatori,10.5,false,2);
-    w.t('Ammoniti: '+rep.ammoniti,10.5,false,2);
-    w.t('Espulsi: '+rep.espulsi,10.5,false,2);
+    listPDF(w,'Marcatori',rep.marcatori);
+    listPDF(w,'Ammoniti',rep.ammoniti);
+    listPDF(w,'Espulsi',rep.espulsi);
     w.t(rep.subsLabel,10.5,true,2);
     if(!rep.subsGroups.length)w.t('nessuna',10.5,false,6);
-    for(const g of rep.subsGroups)w.t(g.label+': '+g.text,10.5,false,6)}
+    for(const g of rep.subsGroups){w.t(g.label,10.5,true,4);
+      for(const line of g.lines)w.t(line,10.5,false,8)}}
   y=Math.max(wl.y,wr.y)+3;hr();
   t('Cronologia',13,true);y+=1;
   for(const l of R.fasi)t(l,10,false,2);
