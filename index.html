@@ -341,7 +341,7 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 'use strict';
 const $=id=>document.getElementById(id);
 const LS_SET='referto_settings_v1', LS_MATCH='referto_match_v1';
-const APP_VERSION='2026.10.04.2';
+const APP_VERSION='2026.10.04.3';
 const SLOT_WINDOW=120000;
 
 function load(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}}
@@ -566,10 +566,10 @@ function reportData(){
       ammoniti:E.filter(e=>e.type==='yellow'&&!e.second).map(e=>'n.'+e.num+' ('+e.min+')'),
       espulsi:E.filter(e=>e.type==='red'||(e.type==='yellow'&&e.second)).map(e=>'n.'+e.num+' ('+e.min+(e.second?', doppia ammonizione':'')+')'),
       subsLabel:'Sostituzioni: '+T.subs+'/'+M.maxSubs+(M.slotsOn?'    Slot: '+T.slots+'/'+M.maxSlots:''),
-      subsGroups:groups.map(g=>{const half=g.items[0].phase==='1T'?' (1° tempo)':g.items[0].phase==='2T'?' (2° tempo)':'';
-        return{label:g.slot==='INT'?'Intervallo':typeof g.slot==='number'?'Slot '+g.slot+half:g.items[0].min,
+      subsGroups:groups.map(g=>({label:g.slot==='INT'?'Intervallo':typeof g.slot==='number'?'Slot '+g.slot:g.items[0].min,
         lines:g.items.map(s=>{const hm=subHalfMin(s);
-          return hm?(hm+"' esce "+s.out+', entra '+s.in):('esce '+s.out+', entra '+s.in)})}}),
+          return hm?('Al '+hm+' del '+(s.phase==='1T'?'1':'2')+' esce il '+s.out+' entra il '+s.in)
+                    :('esce il '+s.out+', entra il '+s.in)})})),
       cronologia:M.events.filter(e=>e.team===k&&e.type!=='slotclose').map(e=>({min:e.min,text:repDesc(e)}))
     }}
   return{hk,ak,titolo:tn(hk)+' - '+tn(ak),data:itDate(M.date),
