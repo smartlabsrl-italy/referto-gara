@@ -195,6 +195,8 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 .col.them .repTeam{color:var(--them)}
 .repLine{font-size:14.5px;line-height:1.5;word-break:break-word}
 .repSubHead{font-weight:600;margin-top:4px}
+.repTag.us{color:var(--us);font-weight:600}
+.repTag.them{color:var(--them);font-weight:600}
 .repSub{padding-left:6px}
 .repSubsFull{margin-bottom:10px}
 .repSubsFull.them{text-align:right}
@@ -341,7 +343,7 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:4px 3px 90px}
 'use strict';
 const $=id=>document.getElementById(id);
 const LS_SET='referto_settings_v1', LS_MATCH='referto_match_v1';
-const APP_VERSION='2026.10.04.3';
+const APP_VERSION='2026.10.04.4';
 const SLOT_WINDOW=120000;
 
 function load(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}}
@@ -568,13 +570,13 @@ function reportData(){
       subsLabel:'Sostituzioni: '+T.subs+'/'+M.maxSubs+(M.slotsOn?'    Slot: '+T.slots+'/'+M.maxSlots:''),
       subsGroups:groups.map(g=>({label:g.slot==='INT'?'Intervallo':typeof g.slot==='number'?'Slot '+g.slot:g.items[0].min,
         lines:g.items.map(s=>{const hm=subHalfMin(s);
-          return hm?('Al '+hm+' del '+(s.phase==='1T'?'1':'2')+' esce il '+s.out+' entra il '+s.in)
-                    :('esce il '+s.out+', entra il '+s.in)})})),
-      cronologia:M.events.filter(e=>e.team===k&&e.type!=='slotclose').map(e=>({min:e.min,text:repDesc(e)}))
+          return hm?{pre:'Al '+hm+' del '+(s.phase==='1T'?'1':'2')+' esce il ',b1:String(s.out),mid:' entra il ',b2:String(s.in)}
+                    :{pre:'esce il ',b1:String(s.out),mid:', entra il ',b2:String(s.in)}})}))
     }}
   return{hk,ak,titolo:tn(hk)+' - '+tn(ak),data:itDate(M.date),
     risultato:C.T[hk].goals+' - '+C.T[ak].goals+(C.forced?' (partita terminata in anticipo)':''),
     fasi:phaseSummary(),
+    cronologia:M.events.filter(e=>e.team&&e.type!=='slotclose').map(e=>({min:e.min,team:e.team,teamName:tn(e.team),text:repDesc(e)})),
     us:block('us'),them:block('them')}
 }
 
@@ -595,12 +597,7 @@ function repSubsBlock(rep){
   if(!rep.subsGroups.length)h+='<div class="repLine">nessuna</div>';
   for(const g of rep.subsGroups){
     h+='<div class="repLine repSubHead">'+esc(g.label)+'</div>';
-    for(const line of g.lines)h+='<div class="repLine">'+esc(line)+'</div>'}
-  return h}
-function repCrono(rep){
-  let h='<div class="repTeam">'+esc(rep.name)+'</div>';
-  if(!rep.cronologia.length)h+='<div class="repLine">nessun evento</div>';
-  for(const e of rep.cronologia)h+='<div class="repLine">'+esc(e.min)+'  '+esc(e.text)+'</div>';
+    for(const line of g.lines)h+='<div class="repLine">'+esc(line.pre)+'<b>'+esc(line.b1)+'</b>'+esc(line.mid)+'<b>'+esc(line.b2)+'</b></div>'}
   return h}
 function showRiepilogo(){
   if(!M||!M.events.length){toast('Nessun dato da mostrare');return}
@@ -612,7 +609,8 @@ function showRiepilogo(){
   h+='<div class="repSubsFull them">'+repSubsBlock(R.them)+'</div>';
   h+='<h2>Cronologia</h2>';
   if(R.fasi.length)h+=R.fasi.map(l=>'<div class="repLine repFasi">'+esc(l)+'</div>').join('');
-  h+='<div class="repCols"><div class="col us">'+repCrono(R.us)+'</div><div class="col them">'+repCrono(R.them)+'</div></div>';
+  if(!R.cronologia.length)h+='<div class="repLine">nessun evento</div>';
+  for(const e of R.cronologia)h+='<div class="repLine"><b>'+esc(e.min)+'</b> <span class="repTag '+e.team+'">'+esc(e.teamName)+'</span> '+esc(e.text)+'</div>';
   $('riepilogoBody').innerHTML=h;
   $('menu').classList.remove('on');$('riepilogo').classList.add('on')}
 $('riepilogoClose').onclick=()=>$('riepilogo').classList.remove('on');
@@ -633,6 +631,14 @@ async function makePDF(){
       sp(mm){cy+=mm},get y(){return cy}}}
   function tR(txt,sz,b){sz=sz||10.5;d.setFont('helvetica',b?'bold':'normal');d.setFontSize(sz);
     for(const l of d.splitTextToSize(txt,180)){if(y>282){d.addPage();y=20}d.text(l,195,y,{align:'right'});y+=sz*0.42+1.6}}
+  function tMixLine(line,sz,right,ind){sz=sz||10.5;ind=ind||0;d.setFontSize(sz);
+    const segs=[{t:line.pre,b:false},{t:line.b1,b:true},{t:line.mid,b:false},{t:line.b2,b:true}];
+    const widths=segs.map(s=>{d.setFont('helvetica',s.b?'bold':'normal');return d.getTextWidth(s.t)});
+    const total=widths.reduce((a,c)=>a+c,0);
+    if(y>282){d.addPage();y=20}
+    let cx=right?195-total:15+ind;
+    for(let i=0;i<segs.length;i++){d.setFont('helvetica',segs[i].b?'bold':'normal');d.text(segs[i].t,cx,y);cx+=widths[i]}
+    y+=sz*0.42+1.6}
   t('REFERTO GARA',17,true);y+=1;
   d.setFont('helvetica','bold');d.setFontSize(14);d.text(R.titolo,15,y);
   d.setFont('helvetica','normal');d.setFontSize(11);d.text('Data: '+R.data,195,y,{align:'right'});
@@ -652,21 +658,17 @@ async function makePDF(){
   y=Math.max(wl.y,wr.y)+3;hr();
   t(R.us.name+' — '+R.us.subsLabel,11,true);
   if(!R.us.subsGroups.length)t('nessuna',10.5,false,2);
-  for(const g of R.us.subsGroups){t(g.label,10.5,true,2);for(const line of g.lines)t(line,10.5,false,6)}
+  for(const g of R.us.subsGroups){t(g.label,10.5,true,2);for(const line of g.lines)tMixLine(line,10.5,false,6)}
   y+=2;
   tR(R.them.name+' — '+R.them.subsLabel,11,true);
   if(!R.them.subsGroups.length)tR('nessuna',10.5);
-  for(const g of R.them.subsGroups){tR(g.label,10.5,true);for(const line of g.lines)tR(line,10.5)}
+  for(const g of R.them.subsGroups){tR(g.label,10.5,true);for(const line of g.lines)tMixLine(line,10.5,true)}
   y+=3;hr();
   t('Cronologia',13,true);y+=1;
   for(const l of R.fasi)t(l,10,false,2);
   y+=1;
-  const wl2=writer(xL,y),wr2=writer(xR,y);
-  for(const rep of[R.us,R.them]){const w=rep===R.us?wl2:wr2;
-    w.t(rep.name,11,true);
-    if(!rep.cronologia.length)w.t('nessun evento',10,false,2);
-    for(const e of rep.cronologia)w.t(e.min+'  '+e.text,10,false,2)}
-  y=Math.max(wl2.y,wr2.y);
+  if(!R.cronologia.length)t('nessun evento',10,false,2);
+  for(const e of R.cronologia)t(e.min+'  '+e.teamName+': '+e.text,10,false,2);
   y+=4;d.setTextColor(120);t('Compilato il '+new Date().toLocaleString('it-IT'),8.5);
   const safe=s=>s.replace(/[^\w\-]+/g,'_');
   const fname='Referto_'+safe(R.us.name)+'_'+safe(R.them.name)+'_'+M.date+'.pdf';
